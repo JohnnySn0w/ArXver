@@ -518,17 +518,17 @@ def parse_line(line_info: Tuple[int, str]) -> None:
 
 def main():
     # open the archive
-    if len(sys.argv) < 2 or sys.argv[1] == "-h":
-        print(
-            "Invalid input\nValid invocation:\n\tpython parse.py infile.json output_directory"
-        )
-        return
     with open(sys.argv[1], "r", encoding="utf-16") as infile:
         with multiprocessing.Pool() as pool:
             pool.map(parse_line, list(enumerate(infile, start=1)))
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] == "-h":
+        print(
+            "Valid invocation:\n\tpython parse.py infile.json output_directory"
+        )
+        exit(0)
     start = time.perf_counter()
     main()
     end = time.perf_counter()

@@ -127,6 +127,8 @@ In your preferred web browser, go to http://127.0.0.1:8000, which is pelican's d
 
 You should now see the chronological feed of all replies and tweets made by the account scraped, plus some extras. 10 at a time if you kept default pagination.
 
+![Alt text](image-1.png)
+
 ![Alt text](image-2.png)
 
 ![Alt text](image-3.png)
