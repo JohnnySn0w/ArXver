@@ -1,0 +1,14 @@
+__pycache__/
+accounts.db
+accounts.txt
+archive_data_1.txt
+archive_data_2.txt
+data.txt
+singleLine.json
+singleline.txt
+twt-archive-site/
+.venv/
+venv/
+output/
+styling.py
+twt-arxv/
