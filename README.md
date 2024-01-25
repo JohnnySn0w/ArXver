@@ -1,5 +1,22 @@
-# ArXver
-For making markdown pages from that one website for archival purposes
+# ArXver 📖
+___
+
+## What
+For making markdown pages from that one website for archival purposes.
+
+### Features
+- Chronology: Timestamps for each tweet
+- Links to originals: available for image tweets
+- Sorted: Solo tweets and reply chains are single post.
+- Profiles: User handles, names, and pfps
+- Tagging: sort posts based on media content
+- Authors: sort tweets to see how often certain users interact
+- Markdown: portable output
+
+### Future content
+- Add links to originals for text-only tweets.
+- Figure out longer tweet chains (default is 3 right now). The conversation data is in there, it's a matter of stitching them together. Might need to break out a db.
+- I'm not entirely certain the scraper is grabbing all tweets right now. Need to check on that. Maybe I underspecified in my archive.
 
 ## How To
 Open a terminal emulator and run the commands you think work for you.
