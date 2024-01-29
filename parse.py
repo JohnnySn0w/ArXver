@@ -28,7 +28,7 @@ import multiprocessing
 import time
 
 from datetime import datetime
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Set, Tuple, Union
 
 # local files
 from config import *
@@ -311,8 +311,21 @@ def gen_media_body(
     instruction_index: int,
     entry_index: int,
     tags: set,
-    item_index: int = None,
-):
+    item_index: Optional[int] = None,
+) -> List[str]:
+    """
+    Generate media body, if media is present
+
+    Args:
+        json_object (dict): The line being worked with.
+        instruction_index (int): Index for the current instruction.
+        entry_index (int): Index for the current entry.
+        tags (set): holds tags for media categorizing
+        item_index (int): May be None, used to switch between different body types
+
+    Returns:
+        List holding html items for main tweet bodies
+    """
     media_urls = get_media_urls(json_object, instruction_index, entry_index, item_index)
     media_body = []
     if media_urls is not None:
@@ -339,9 +352,25 @@ def gen_main_body(
     json_object: dict,
     instruction_index: int,
     entry_index: int,
-    authors: set,
-    item_index: int = None,
-):
+    authors: Set[str],
+    item_index: Optional[int] = None,
+) -> Tuple[str, Optional[int]]:
+    """
+    Generate main tweet/profile body
+
+    Args:
+        json_object (dict): The line being worked with.
+        instruction_index (int): Index for the current instruction.
+        entry_index (int): Index for the current entry.
+        authors (set): holds tagged authors
+        item_index (int): May be None, used to switch between different body types
+
+    Returns:
+        Tuple containing the body for a tweet's media, plus the item_index it corresponds to if there are multiple items
+
+    Raises:
+        TypeError: If an error occurs in parsing the entry.
+    """
     try:
         user_pfp, user_handle, user_name = get_user_info(
             json_object, instruction_index, entry_index, item_index
@@ -365,7 +394,22 @@ def gen_main_body(
     )
 
 
-def gen_page(json_object, instruction_index, entry_index, convo=False):
+def gen_page(json_object: dict, instruction_index: int, entry_index: int, convo: bool = False) -> None:
+    """
+    Generate page file after getting component bodies
+
+    Args:
+        json_object (dict): The line being worked with.
+        instruction_index (int): Index for the current instruction.
+        entry_index (int): Index for the current entry.
+        convo (bool): switch for multi vs single tweet entries
+
+    Returns:
+        Nothing
+
+    Raises:
+        TypeError: If an error occurs in parsing the entry.
+    """
     tags = set()
     authors = set()
     main_bodies = []
@@ -431,11 +475,9 @@ def parse_entry(
     try:
         # other types aren't of interest to us (like cursors)
         if entry_type == "TimelineTimelineItem":
-            # gen_single(json_object, instruction_index, entry_index)
             gen_page(json_object, instruction_index, entry_index)
         elif entry_type == "TimelineTimelineModule":
             gen_page(json_object, instruction_index, entry_index, convo=True)
-            # gen_convo(json_object, instruction_index, entry_index)
     except TypeError as e:
         logging.error(e, instruction_index, entry_index)
         raise
