@@ -36,7 +36,7 @@ from dict_chains import *
 from styling import *
 
 """
-TODO: cleanup the two gens, clean up comments, link pfp to user profile on x
+TODO: link pfp to user profile on x
 """
 
 
@@ -387,7 +387,7 @@ def gen_main_body(
         raise
     datetime_readable = process_datetime(date_time, human_readable=True)
     return (
-        f'### <a href="{user_pfp}" target="_blank">'
+        f'### <a href="https://twitter.com/{user_handle}/" target="_blank">'
         + f'<img src="{user_pfp}" {pfp_style} /></a>'
         + f" {user_name} *\(@{user_handle}\)*\n> — {datetime_readable}\n\n>{tweet}\n\n",
         item_index,
