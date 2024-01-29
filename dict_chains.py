@@ -137,8 +137,10 @@ def tweet_chain(instruction_index, entry_index, item_index=None, alt=False):
     chain_pre = pre_chain(instruction_index, entry_index, item_index)
     chain_post = [
         "legacy",
-        "full_text",
     ]
     if alt:
         chain_post.insert(0, "tweet")
-    return chain_pre + chain_mid + chain_post
+    return (
+        chain_pre + chain_mid + chain_post + ["full_text"],
+        chain_pre + chain_mid + chain_post + ["id_str"]
+    )

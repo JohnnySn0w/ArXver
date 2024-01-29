@@ -36,7 +36,7 @@ from dict_chains import *
 from styling import *
 
 """
-TODO: link pfp to user profile on x
+TODO: make conversations longer?
 """
 
 
@@ -102,18 +102,20 @@ def get_text(
     Returns:
         Optional[str]: Tweet text from a conversation, or None if the path is not found.
     """
-    text = get_nested_value(
-        json_object, tweet_chain(instruction_index, entry_index, item_index)
+    text, tweet_id = (
+        get_nested_value(json_object, chain)
+        for chain in tweet_chain(instruction_index, entry_index, item_index)
     )
     if text is None:
-        text = get_nested_value(
-            json_object,
-            tweet_chain(instruction_index, entry_index, item_index, alt=True),
+        text, tweet_id = (
+            get_nested_value(json_object, chain)
+            for chain in tweet_chain(instruction_index, entry_index, item_index)
         )
         if text is None:
             return None
     # This replace fixes a newline issue(tweets can have those!), make sure pelican or whatever gen you're using has the md extension nl2br enabled
-    return text.replace("\n\n", "\n> ")
+    return (text.replace("\n\n", "<br/><br/>"), tweet_id)
+    # return (text, tweet_id)
 
 
 def get_media_urls(
@@ -343,8 +345,6 @@ def gen_media_body(
             media_body.append(
                 f'> <a href="{media_url}" target="_blank">{media_embed}</a>\n\n'
             )
-        if media_body:
-            media_body.append(f"[source tweet]({media_url_direct})\n\n")
     return media_body
 
 
@@ -378,7 +378,7 @@ def gen_main_body(
         date_time = get_datetime(
             json_object, instruction_index, entry_index, item_index
         )
-        tweet = get_text(json_object, instruction_index, entry_index, item_index)
+        tweet, tweet_id = get_text(json_object, instruction_index, entry_index, item_index)
         authors.add(user_handle)
         if not all([user_pfp, user_handle, user_name, date_time, tweet]):
             logging.debug(instruction_index, entry_index, item_index)
@@ -389,7 +389,8 @@ def gen_main_body(
     return (
         f'### <a href="https://twitter.com/{user_handle}/" target="_blank">'
         + f'<img src="{user_pfp}" {pfp_style} /></a>'
-        + f" {user_name} *\(@{user_handle}\)*\n> — {datetime_readable}\n\n>{tweet}\n\n",
+        + f' {user_name} *\(@{user_handle}\)* — {datetime_readable} — <a href="https://twitter.com/{user_handle}/status/{tweet_id}" target="_blank">source</a>\n\n'
+        + f'<div {tweet_style}>{tweet}</div>\n\n',
         item_index,
     )
 
