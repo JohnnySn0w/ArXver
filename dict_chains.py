@@ -34,6 +34,7 @@ entry_type_name_chain = ["content", "__typename"]
 valid_entry_types = ["TimelineTimelineModule", "TimelineTimelineItem"]
 
 # This is for filtering follow recommends, which wind up in the data but aren't what we want.
+# cursors still get through, but they're filtered by parseline()'s logic
 invalid_entryid_type = "who-to-follow"
 
 

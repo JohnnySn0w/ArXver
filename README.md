@@ -108,15 +108,15 @@ python3 .\parse.py ..\scraping\archive_data_1.txt .\twt-arxv\content\
 ```
 
 Should finish relatively quickly. Will take a little longer for more tweets. 
-with ~12k tweets mine lasted ~1.5s.
+~12k tweets lasted ~1.5s.
 
-now all the markdown files are in place, last two commands are pelican again
+Now all the markdown files are in place, last two commands are pelican again.
 
 This will generate your HTML files:
 ```
 pelican content
 ```
-*This takes ~33 seconds on my machine.*
+
 
 This will serve them:
 ```

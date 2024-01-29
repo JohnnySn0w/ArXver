@@ -30,13 +30,10 @@ import time
 from datetime import datetime
 from typing import Any, List, Optional, Tuple, Union
 
-# imported packages
-from json_repair import repair_json
-
 # local files
+from config import *
 from dict_chains import *
 from styling import *
-
 
 """
 TODO: cleanup the two gens, clean up comments, link pfp to user profile on x
@@ -150,8 +147,9 @@ def get_media_urls(
     if media is not None:
         for thing in media:
             variant_index = None
-            if get_nested_value(thing, media_type_chain) == "video":
-                bitrate = 0
+            media_type = get_nested_value(thing, media_type_chain)
+            if media_type == "video" or media_type == "animated_gif":
+                bitrate = -1
                 for variation_index, variation in enumerate(
                     get_nested_value(thing, media_variants_chain)
                 ):
@@ -259,30 +257,16 @@ def get_valid_entries(
 
     entries = get_nested_value(json_object, entry_chain(instruction_index))
     if entries is None:
-        print("no entry found")
-        return None
-    return [
-        (entry_index, entry["content"]["__typename"])
-        for entry_index, entry in enumerate(entries)
-        if "who-to-follow" not in entries[entry_index]["entryId"]
-        and (
-            entries[entry_index]["content"]["__typename"] == "TimelineTimelineModule"
-            or entries[entry_index]["content"]["__typename"] == "TimelineTimelineItem"
-        )
-    ]
-
-    # TODO: understand why this made things faster??
-    # This change dropped the parse time by like a whole second??? 1.44 avg to 0.44??
-    # entries = get_nested_value(json_object, entry_chain(instruction_index))
-    # if entries is None:
-    #     return None
-    # return [
-    #     (entry_index, get_nested_value(entry, entry_type_name_chain))
-    #     for entry_index, entry in enumerate(entries)
-    #     if invalid_entryid_type
-    #     not in get_nested_value(entries, entryid_chain(entry_index))
-    #     and (get_nested_value(entries, entry_type_name_chain) in valid_entry_types)
-    # ]
+        return []
+    entry_list = []
+    for entry_index, entry in enumerate(entries):  # unchanged
+        if invalid_entryid_type not in get_nested_value(
+            entries, entryid_chain(entry_index)
+        ):
+            entry_list.append(
+                (entry_index, get_nested_value(entry, entry_type_name_chain))
+            )
+    return entry_list
 
 
 def get_valid_instructions(json_object: dict) -> List[int]:
@@ -317,122 +301,105 @@ def get_items(json_object: dict, instruction_index: int, entry_index: int) -> Li
         List[int]: A list of valid item indexes.
     """
     items = get_nested_value(json_object, item_chain(instruction_index, entry_index))
+    if items is None:
+        return [None]
     return [item_index for item_index, _ in enumerate(items)]
 
 
-def gen_single(json_object, instruction_index, entry_index):
-    tags = set(["single tweet"])
-    authors = set()
-    user_pfp, user_handle, user_name = get_user_info(
-        json_object, instruction_index, entry_index
-    )
-    date_time = get_datetime(json_object, instruction_index, entry_index)
-    tweet = get_text(json_object, instruction_index, entry_index)
-    media_urls = get_media_urls(json_object, instruction_index, entry_index)
-
-    authors.add(user_handle)
-
-    sanitized_datetime = process_datetime(date_time)
-    filename = sanitized_datetime + ".md"
-    os.makedirs(sys.argv[2], exist_ok=True)
-    filepath = os.path.join(sys.argv[2], filename)
-
+def gen_media_body(
+    json_object: dict,
+    instruction_index: int,
+    entry_index: int,
+    tags: set,
+    item_index: int = None,
+):
+    media_urls = get_media_urls(json_object, instruction_index, entry_index, item_index)
     media_body = []
     if media_urls is not None:
         if len(media_urls) > 1:
             tags.add("photos")
-        for media_url, media_url_direct, media_type in media_urls:
+        for _, media_info in enumerate(media_urls):
+            media_url, media_url_direct, media_type = media_info
             tags.add(media_type)
             if media_type == "video":
                 media_embed = f'<video width="100%" height="auto" controls><source src="{media_url}" type="video/mp4"/>Your browser does not support the video tag.</video>'
+            elif media_type == "animated_gif":
+                media_embed = f'<video width="100%" height="auto" autoplay loop muted><source src="{media_url}" type="video/mp4"/>Your browser does not support the video tag.</video>'
             else:
                 media_embed = f'<img src="{media_url}" width="100%" height="auto" />'
             media_body.append(
                 f'> <a href="{media_url}" target="_blank">{media_embed}</a>\n\n'
-            )  # images
+            )
         if media_body:
             media_body.append(f"[source tweet]({media_url_direct})\n\n")
-
-    with open(
-        filepath, "w", encoding="utf-8"
-    ) as outfile:  # might neet to clean up date_time
-        outfile.writelines(
-            [
-                f"Title: {process_datetime(date_time, human_readable=True)}\n",
-                f"Date: {date_time}\n",
-                f"Category: Tweet\n",
-                f"Tags: {','.join(tag for tag in tags if tag is not None)}\n",
-                f"Authors: {','.join(author for author in authors if author is not None)}\n\n",
-                f'### <a href="{user_pfp}" target="_blank">',
-                f'<img src="{user_pfp}" {pfp_style} /></a>',
-                f" {user_name} *\(@{user_handle}\)*\n\n",
-                f"> {tweet}\n\n",
-            ]
-            + media_body
-        )  # user info + date_time, tweet
+    return media_body
 
 
-def gen_convo(json_object, instruction_index, entry_index):
-    first_date_time = get_datetime(json_object, instruction_index, entry_index, 0)
+def gen_main_body(
+    json_object: dict,
+    instruction_index: int,
+    entry_index: int,
+    authors: set,
+    item_index: int = None,
+):
+    try:
+        user_pfp, user_handle, user_name = get_user_info(
+            json_object, instruction_index, entry_index, item_index
+        )
+        date_time = get_datetime(
+            json_object, instruction_index, entry_index, item_index
+        )
+        tweet = get_text(json_object, instruction_index, entry_index, item_index)
+        authors.add(user_handle)
+        if not all([user_pfp, user_handle, user_name, date_time, tweet]):
+            logging.debug(instruction_index, entry_index, item_index)
+    except:
+        logging.error(instruction_index, entry_index, item_index)
+        raise
+    datetime_readable = process_datetime(date_time, human_readable=True)
+    return (
+        f'### <a href="{user_pfp}" target="_blank">'
+        + f'<img src="{user_pfp}" {pfp_style} /></a>'
+        + f" {user_name} *\(@{user_handle}\)*\n> — {datetime_readable}\n\n>{tweet}\n\n",
+        item_index,
+    )
+
+
+def gen_page(json_object, instruction_index, entry_index, convo=False):
+    tags = set()
+    authors = set()
+    main_bodies = []
+    media_bodies = {}
+    items = get_items(
+        json_object, instruction_index, entry_index
+    )  # a list of indexes, or [None]
+    if convo:
+        tags.add("conversation")
+        item_index = 0
+    else:
+        tags.add(f"single {tweets_or_xeets}")
+        item_index = None
+    first_date_time = get_datetime(
+        json_object, instruction_index, entry_index, item_index=items[0]
+    )
     sanitized_datetime = process_datetime(first_date_time)
     filename = sanitized_datetime + ".md"
     os.makedirs(sys.argv[2], exist_ok=True)
     filepath = os.path.join(sys.argv[2], filename)
 
-    with open(filepath, "w", encoding="utf-8") as outfile:
-        tags = set(["conversation"])
-        authors = set()
-        main_bodies = []
-        media_bodies = {}
-        for item_index in get_items(json_object, instruction_index, entry_index):
-            try:
-                user_pfp, user_handle, user_name = get_user_info(
-                    json_object, instruction_index, entry_index, item_index
-                )
-                date_time = get_datetime(
-                    json_object, instruction_index, entry_index, item_index
-                )
-                tweet = get_text(
-                    json_object, instruction_index, entry_index, item_index
-                )
-                if not all([user_pfp, user_handle, user_name, date_time, tweet]):
-                    print(instruction_index, entry_index, item_index)
-            except:
-                print(instruction_index, entry_index, item_index)
-                raise
-            media_urls = get_media_urls(
-                json_object, instruction_index, entry_index, item_index
+    # generate bodies and tags
+    for item_index in items:
+        main_bodies.append(
+            gen_main_body(
+                json_object, instruction_index, entry_index, authors, item_index
             )
-            datetime_readable = process_datetime(date_time, human_readable=True)
-            main_bodies.append(
-                (
-                    f'### <a href="{user_pfp}" target="_blank">'
-                    + f'<img src="{user_pfp}" {pfp_style} /></a>'
-                    + f" {user_name} *\(@{user_handle}\)*\n> — {datetime_readable}\n\n>{tweet}\n\n",
-                    item_index,
-                )
-            )
-            authors.add(user_handle)
-            if media_urls is not None:
-                media_body = []
-                if len(media_urls) > 1:
-                    tags.add("photos")
-                for media_index, media_info in enumerate(media_urls):
-                    media_url, media_url_direct, media_type = media_info
-                    tags.add(media_type)
-                    if media_type == "video":
-                        media_embed = f'<video width="100%" height="auto" controls><source src="{media_url}" type="video/mp4"/>Your browser does not support the video tag.</video>'
-                    else:
-                        media_embed = (
-                            f'<img src="{media_url}" width="100%" height="auto" />'
-                        )
-                    media_body.append(
-                        f'> <a href="{media_url}" target="_blank">{media_embed}</a>\n\n'
-                    )
-                if media_body:
-                    media_body.append(f"[source tweet]({media_url_direct})\n\n")
-                media_bodies[item_index] = media_body
+        )
+        media_bodies[item_index] = gen_media_body(
+            json_object, instruction_index, entry_index, tags, item_index
+        )
 
+    # printout to file
+    with open(filepath, "w", encoding="utf-8") as outfile:
         outfile.write(
             f"Title: {process_datetime(first_date_time, human_readable=True)}\n"
             f"Date: {first_date_time}\n"
@@ -445,13 +412,6 @@ def gen_convo(json_object, instruction_index, entry_index):
             if item_index in media_bodies:
                 for media_item in media_bodies[item_index]:
                     outfile.write(media_item)
-
-
-def gen_page(json_object, instruction_index, entry_index, convo=False):
-    if convo:
-        first_date_time = get_datetime(json_object, instruction_index, entry_index, 0)
-        sanitized_datetime = process_datetime(first_date_time)
-    pass
 
 
 def parse_entry(
@@ -469,14 +429,15 @@ def parse_entry(
         TypeError: If an error occurs in parsing the entry.
     """
     try:
+        # other types aren't of interest to us (like cursors)
         if entry_type == "TimelineTimelineItem":
-            gen_single(json_object, instruction_index, entry_index)
-            # gen_page(json_object, instruction_index, entry_index)
+            # gen_single(json_object, instruction_index, entry_index)
+            gen_page(json_object, instruction_index, entry_index)
         elif entry_type == "TimelineTimelineModule":
-            # gen_page(json_object, instruction_index, entry_index, convo=True)
-            gen_convo(json_object, instruction_index, entry_index)
+            gen_page(json_object, instruction_index, entry_index, convo=True)
+            # gen_convo(json_object, instruction_index, entry_index)
     except TypeError as e:
-        print(e, instruction_index, entry_index)
+        logging.error(e, instruction_index, entry_index)
         raise
 
 
@@ -496,7 +457,6 @@ def parse_line(line_info: Tuple[int, str]) -> None:
     line_number, line = line_info
 
     try:
-        # print(f"\n\nchecking line {line_number}")
         json_object = json.loads(line)
         # we now have a json object with all the data we wanna play with
 
@@ -507,13 +467,13 @@ def parse_line(line_info: Tuple[int, str]) -> None:
             ):
                 parse_entry(json_object, instruction_index, entry_index, entry_type)
     except json.JSONDecodeError:
-        print(f"Invalid JSON on line {line_number}")
+        logging.warning(f"Invalid JSON on line {line_number}")
     except OSError as e:
-        print(f"Error creating file for line {line_number}: {e}")
+        logging.critical(f"Error creating file for line {line_number}: {e}")
     except TypeError as e:
-        print(f"TypeError occured on line {line_number}: {e}")
+        logging.warning(f"TypeError occured on line {line_number}: {e}")
     except Exception as e:
-        print(f"uknown error occured on line {line_number}: {e}")
+        logging.error(f"uknown error occured on line {line_number}: {e}")
 
 
 def main():
@@ -525,12 +485,10 @@ def main():
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] == "-h":
-        print(
-            "Valid invocation:\n\tpython parse.py infile.json output_directory"
-        )
+        print("Valid invocation:\n\tpython parse.py infile.json output_directory")
         exit(0)
     start = time.perf_counter()
     main()
     end = time.perf_counter()
     total_time = end - start
-    print(f"Total processing time: {total_time:.6f} seconds")
+    logging.debug(f"Total processing time: {total_time:.6f} seconds")
