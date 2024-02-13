@@ -2,7 +2,7 @@
 ___
 
 ## What
-For making markdown pages from that one website for archival purposes.
+For making markdown pages from that one website for archival purposes. Using the tags system, works incredibly well with Obsidian to do knowledge graphing of various authors and conversations.
 
 ### Features
 - Chronology: Timestamps for each tweet
